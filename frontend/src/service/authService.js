@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8000";
+// const BASE_URL = "http://localhost:8000"; local setup
+const BASE_URL = 'http://login-app.local/api'; // kubernetes set up
+
 
 export const loginUser= async(username, password) =>{
     try {
