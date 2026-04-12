@@ -182,8 +182,109 @@ This setup teaches you:
 5. **Health checks** (Probes)
 6. **Resource limits** (CPU/Memory)
 
-It's like learning to drive - lots of parts, but once you understand each piece, it all clicks together!
 
----
+### Issue: Cannot Connect to login-app.local Port 80
+Problem:
+bashcurl http://login-app.local/api/health
+Error: Failed to connect to login-app.local port 80 after 77189 ms: Couldn't connect to server
 
-Does this make more sense now? Want me to clarify any specific part?
+Root Cause:
+Minikube runs in an isolated VM/container. The Ingress controller is running on port 80 inside that VM (192.168.49.2), but your host machine cannot directly access that port due to network isolation.
+
+Verification Steps:
+bash# Check Ingress is configured correctly
+kubectl get ingress
+## Shows: ADDRESS=192.168.49.2 ✅
+
+### Check Ingress controller is running
+kubectl get pods -n ingress-nginx
+
+Shows: ingress-nginx-controller-xxx Running ✅
+
+### Check Minikube IP
+minikube ip
+### Returns: 192.168.49.2 ✅
+
+### But direct connection fails
+curl http://192.168.49.2/api/health -H "Host: login-app.local"
+### Timeout ❌
+
+Solution 1: Minikube Tunnel (Recommended for Ingress Testing)
+Minikube tunnel creates a network route from your host to the Minikube cluster, exposing LoadBalancer and Ingress services.
+Terminal 1 - Start Tunnel (keep running):
+bashminikube tunnel
+### Enter password when prompted
+#### Output:
+#### ✅ Tunnel successfully started
+Terminal 2 - Test Access:
+bash# Wait 10 seconds after tunnel starts
+sleep 10
+
+#### Test backend
+curl http://login-app.local/api/health
+#### Should return: {"status":"healthy","service":"backend"}
+
+### Test login
+curl -X POST http://login-app.local/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"zaid","password":"zaid"}'
+#### Should return: {"token":"eyJhbGc..."}
+
+### Open in browser
+open http://login-app.local  # macOS
+#### or navigate to: http://login-app.local
+Why this works:
+
+In production Kubernetes (AWS/GCP/Azure), cloud providers automatically expose Ingress
+minikube tunnel simulates this cloud load balancer behavior
+You're still learning real Ingress concepts - tunnel is just a local development tool
+
+
+Solution 2: Port Forwarding (For Testing When Tunnel Fails)
+If minikube tunnel doesn't work on your system, use port-forwarding to test services directly.
+Terminal 1 - Forward Backend:
+bashkubectl port-forward service/backend-service 8000:8000
+#### Keep running
+Terminal 2 - Forward Frontend:
+bashkubectl port-forward service/frontend-service 3000:80
+#### Keep running
+Terminal 3 - Test:
+bash# Test backend directly
+curl http://localhost:8000/health
+curl http://localhost:8000/
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"zaid","password":"zaid"}'
+
+### Test frontend (returns HTML)
+curl http://localhost:3000/
+Update Frontend for Port-Forward Testing:
+Since frontend will try to call http://login-app.local/api, update the base URL:
+
+Edit frontend/src/services/authService.js:
+
+javascript// Change from:
+const BASE_URL = 'http://login-app.local/api';
+
+// To:
+const BASE_URL = 'http://localhost:8000';
+
+Rebuild and redeploy:
+
+bash# Use Minikube's Docker
+eval $(minikube docker-env)
+
+#### Rebuild frontend
+cd frontend
+docker build -t login-frontend:latest .
+
+#### Delete old pods (auto-recreate with new image)
+kubectl delete pods -l app=frontend
+
+#### Wait for ready
+kubectl get pods -w
+
+Test in browser:
+
+http://localhost:3000
+Login: zaid / zaid

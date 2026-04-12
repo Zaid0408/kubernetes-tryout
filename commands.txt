@@ -50,6 +50,55 @@ minikube ip
 
 minikube stop 
 
+# TO WORK WITH INGRESS 
+
+minikube tunnel
+
+(fill password)
+
+curl commands to check for 
+curl http://login-app.local/api/health
+curl http://login-app.local/api/
+curl http://login-app.local/
+
+The Core Problem
+Your Minikube VM (192.168.49.2) is isolated from your Mac's network. You MUST use minikube tunnel to access Ingress on port 80.
+
+Let's Try Minikube Tunnel (This is NOT defeating the purpose)
+Why Tunnel is Needed:
+Ingress works perfectly inside the cluster. The tunnel just exposes it to your host machine. In production Kubernetes (AWS, GCP, Azure), you don't need tunnel because the cloud provider handles this automatically.
+Think of it this way:
+
+Production: Cloud load balancer exposes Ingress
+Minikube: minikube tunnel simulates the cloud load balancer
+
+# To check locally without ingress use port forwarding 
+
+kubectl port-forward service/backend-service 8000:8000
+kubectl port-forward service/frontend-service 3000:80
+
+same curl commands as above but replace login-app.local with localhost
+
+change base url in auth.js to 'http://localhost:8000';
+
+Rebuild Frontend Image
+# Make sure you're using Minikube's Docker
+eval $(minikube docker-env)
+
+# Rebuild frontend
+cd frontend
+docker build -t login-frontend:latest .
+
+# Delete old frontend pods (they'll auto-recreate with new image)
+kubectl delete pods -l app=frontend
+
+# Wait for new pods to be ready
+kubectl get pods -w
+
+Restart Port-Forward 
+Now Test in Browser
+Open: http://localhost:3000
+Login with: zaid / zaid
 
 running next time :
 

@@ -3,21 +3,14 @@ kind: Ingress
 metadata: 
   name: login-app-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   ingressClassName: nginx
   rules: 
   - host: login-app.local
     http: 
       paths:
-      - path: /()(.*)
-        pathType: ImplementationSpecific
-        backend: 
-          service: 
-            name: frontend-service
-            port: 
-              number: 80
+      # Backend MUST come first (more specific path)
       - path: /api/(.*)
         pathType: ImplementationSpecific
         backend: 
@@ -25,3 +18,11 @@ spec:
             name: backend-service
             port: 
               number: 8000
+      # Frontend comes second (catch-all)
+      - path: /(.*)
+        pathType: ImplementationSpecific
+        backend: 
+          service: 
+            name: frontend-service
+            port: 
+              number: 80
