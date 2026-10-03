@@ -1,0 +1,184 @@
+first time : 
+
+# 1. Start Minikube
+minikube start
+
+# 2. Enable Ingress addon
+minikube addons enable ingress
+
+# 3. Use Minikube's Docker daemon (IMPORTANT!)
+eval $(minikube docker-env)
+# On Windows PowerShell use:
+# minikube docker-env | Invoke-Expression
+
+# 4. Build Docker images (from project root)
+cd backend
+docker build -t login-backend:latest .
+
+cd ../frontend
+docker build -t login-frontend:latest .
+
+# 5. Verify images are in Minikube
+docker images | grep login
+
+# 6. Apply Kubernetes manifests (from project root)
+cd ..
+kubectl apply -f k8s/
+
+# 7. Wait for pods to be ready
+kubectl get pods -w
+# Press Ctrl+C when all pods show "Running" and "2/2 READY"
+
+# 8. Check services
+kubectl get services
+
+# 9. Check ingress
+kubectl get ingress
+
+# 10. Get Minikube IP
+minikube ip
+# Note this IP (e.g., 192.168.49.2)
+
+# 11. Add to hosts file
+# On Windows: C:\Windows\System32\drivers\etc\hosts
+# On macOS/Linux: /etc/hosts
+# Add this line (replace with your minikube IP):
+# 192.168.49.2 login-app.local
+
+# 12. Open in browser
+# http://login-app.local
+
+minikube stop 
+
+# TO WORK WITH INGRESS 
+
+minikube tunnel
+
+(fill password)
+
+curl commands to check for 
+curl http://login-app.local/api/health
+curl http://login-app.local/api/
+curl http://login-app.local/
+
+The Core Problem
+Your Minikube VM (192.168.49.2) is isolated from your Mac's network. You MUST use minikube tunnel to access Ingress on port 80.
+
+Let's Try Minikube Tunnel (This is NOT defeating the purpose)
+Why Tunnel is Needed:
+Ingress works perfectly inside the cluster. The tunnel just exposes it to your host machine. In production Kubernetes (AWS, GCP, Azure), you don't need tunnel because the cloud provider handles this automatically.
+Think of it this way:
+
+Production: Cloud load balancer exposes Ingress
+Minikube: minikube tunnel simulates the cloud load balancer
+
+# To check locally without ingress use port forwarding 
+
+kubectl port-forward service/backend-service 8000:8000
+kubectl port-forward service/frontend-service 3000:80
+
+same curl commands as above but replace login-app.local with localhost
+
+change base url in auth.js to 'http://localhost:8000';
+
+Rebuild Frontend Image
+# Make sure you're using Minikube's Docker
+eval $(minikube docker-env)
+
+# Rebuild frontend
+cd frontend
+docker build -t login-frontend:latest .
+
+# Delete old frontend pods (they'll auto-recreate with new image)
+kubectl delete pods -l app=frontend
+
+# Wait for new pods to be ready
+kubectl get pods -w
+
+Restart Port-Forward 
+Now Test in Browser
+Open: http://localhost:3000
+Login with: zaid / zaid
+
+running next time :
+
+minikube start 
+kubectl apply -f k8s/
+
+continue from command 7 from above 
+
+k9s
+Open a terminal and run the k9s command. This will start the k9s tool and connect to your Kubernetes cluster.
+
+In the k9s tool, you can use the arrow keys to navigate through the different views, such as the pods view, services view, and deployments view.
+
+To view the pods, press the p key. This will display a list of pods in the cluster.
+
+To view the ingress, press the i key. This will display a list of ingress resources in the cluster.
+
+To view the details of a specific pod or ingress, select it in the list and press the Enter key. This will display detailed information about the selected resource.
+
+To exit the k9s tool, press the q key.
+
+To view Ingress resources in K9s, type :ingress or the shorter alias :ing into the command prompt. 
+Here is how to do it:
+Open K9s.
+Press the colon : key to activate the command prompt at the bottom of the screen.
+Type ingress or the alias ing.
+Press Enter. 
+Using k9s can be a helpful way to view and manage your Kubernetes resources in a more interactive way. It provides a console-like interface that allows you to navigate through different views and interact with your resources.
+
+Test Backend Directly
+kubectl port-forward service/backend-service 8000:8000
+# In another terminal:
+curl http://localhost:8000/health
+
+test frontend directly
+kubectl port-forward service/frontend-service 3000:80
+# Open: http://localhost:3000
+
+test from ingress 
+
+# Open browser: http://login-app.local
+# Login with: zaid / zaid
+
+
+IMPORTANT COMMANDS 
+
+# View all resources
+kubectl get all
+
+# Describe a pod
+kubectl describe pod <pod-name>
+
+# View logs
+kubectl logs <pod-name>
+kubectl logs -f <pod-name>  # Follow logs
+
+# Scale deployments
+kubectl scale deployment backend-deployment --replicas=3
+
+# Delete everything
+kubectl delete -f k8s/
+
+# Restart minikube
+minikube stop
+minikube start
+
+# Access Kubernetes dashboard
+minikube dashboard
+
+
+Troubleshooting
+If pods won't start:
+bashkubectl describe pod <pod-name>
+kubectl logs <pod-name>
+If ingress doesn't work:
+bashkubectl get ingress
+kubectl describe ingress login-app-ingress
+# Check if ADDRESS shows an IP
+If images not found:
+bash# Make sure you ran: eval $(minikube docker-env)
+# Rebuild images
+docker build -t login-backend:latest ./backend
+docker build -t login-frontend:latest ./frontend
